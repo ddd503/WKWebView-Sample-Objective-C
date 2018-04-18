@@ -35,6 +35,12 @@
                                                     <action selector="forword:" destination="BYZ-38-t0r" id="9I9-1T-RYZ"/>
                                                 </connections>
                                             </barButtonItem>
+                                            <barButtonItem width="42" style="plain" systemItem="fixedSpace" id="T1c-AU-ROB"/>
+                                            <barButtonItem title="JS実行" id="9VR-RE-f8t">
+                                                <connections>
+                                                    <action selector="jsTrigger:" destination="BYZ-38-t0r" id="YIp-fP-JQ3"/>
+                                                </connections>
+                                            </barButtonItem>
                                             <barButtonItem style="plain" systemItem="flexibleSpace" id="kQM-jh-GFV"/>
                                             <barButtonItem systemItem="refresh" id="QQ3-2I-gQl">
                                                 <connections>

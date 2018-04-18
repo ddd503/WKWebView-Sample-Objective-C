@@ -9,7 +9,7 @@
 #import "ViewController.h"
 #import <WebKit/WebKit.h>
 
-@interface ViewController () <WKUIDelegate, WKNavigationDelegate>
+@interface ViewController () <WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler>
 @property (weak, nonatomic) IBOutlet UIView *baseView;
 @property (weak, nonatomic) IBOutlet UIToolbar *toolbar;
 @property (nonatomic) WKWebView *webView;
@@ -50,7 +50,7 @@ static NSString *const RequestURL = @"https://www.apple.com/";
     [self.webView loadRequest: request];
 }
 
-/// JSをセット
+/// JSをセット（生成時に仕込み。JS側でトリガーする）
 - (WKWebViewConfiguration *)setJS {
     NSString *jsString = @"";
     WKUserScript *userScript = [[WKUserScript alloc] initWithSource: jsString
@@ -58,6 +58,8 @@ static NSString *const RequestURL = @"https://www.apple.com/";
                                                    forMainFrameOnly:YES];
     WKUserContentController *wkUController = [WKUserContentController new];
     [wkUController addUserScript: userScript];
+    // JSを判別するためのキーを設定
+    [wkUController addScriptMessageHandler:self name:@"callbackHandler"];
     
     WKWebViewConfiguration *wkWebConfig = [WKWebViewConfiguration new];
     wkWebConfig.userContentController = wkUController;
@@ -65,6 +67,17 @@ static NSString *const RequestURL = @"https://www.apple.com/";
     return wkWebConfig;
 }
 
+/// JS実行（アプリ側から任意のタイミングでトリガー）
+- (void)triggerJS:(NSString *)jsString webView:(WKWebView *)webView {
+    [webView evaluateJavaScript:jsString
+              completionHandler:^(NSString *result, NSError *error){
+                  if (error != nil) {
+                      NSLog(@"JS実行時のエラー：%@", error.localizedDescription);
+                      return;
+                  }
+                  NSLog(@"出力結果：%@", result);
+              }];
+}
 
 /// autoLayoutをセット
 - (void)setupWKWebViewConstain: (WKWebView *)webView {
@@ -134,6 +147,11 @@ static NSString *const RequestURL = @"https://www.apple.com/";
     [self.webView reload];
 }
 
+- (IBAction)jsTrigger:(id)sender {
+    /// Configurationで設定したJSをメッセージ付きで呼び出し（戻り値なし）
+    [self triggerJS:@"window.webkit.messageHandlers.callbackHandler.postMessage('Hello Native!');" webView:self.webView];
+}
+
 #pragma mark - UIWebViewDelegate Methods
 /// 新しいウィンドウ、フレームを指定してコンテンツを開く時
 - (WKWebView *)webView:(WKWebView *)webView
@@ -190,6 +208,8 @@ createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
     NSLog(@"読み込み完了");
     [self.baseView bringSubviewToFront: self.toolbar];
+    /// 読み込み完了時にHTML全体を受け取るJSを実行（戻り値あり）
+    [self triggerJS:@"document.body.innerHTML" webView:webView];
 }
 
 // 読み込み失敗
@@ -200,6 +220,14 @@ createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration
 // 接続失敗
 - (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
     NSLog(@"エラーコード：%ld", (long)error.code);
+}
+
+#pragma mark - WKScriptMessageHandler Methods
+- (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
+    // 指定したコールバック名を判断して処理を分岐
+    if([message.name  isEqual: @"callbackHandler"]) {
+        NSLog(@"%@", [NSString stringWithFormat:@"%@", message.body]);
+    }
 }
 
 @end
